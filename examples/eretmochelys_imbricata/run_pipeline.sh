@@ -16,14 +16,14 @@ pipeline() {
 
 	if [ ! -f sra/ok ]; then
 		docker_run gitobioinformatics/sra-tools \
-			prefetch $NCBI_SRA --output-directory sra/
+			time -o sra/time prefetch $NCBI_SRA --output-directory sra/
 
 		touch sra/ok
 	fi
 
 	if [ ! -f refs/ok ]; then
 		docker_run gitobioinformatics/sra-tools \
-			fastq-dump --defline-seq '@$sn/$ri' --split-files --outdir refs/ \
+			time -o refs/time fastq-dump --defline-seq '@$sn/$ri' --split-files --outdir refs/ \
 				sra/${NCBI_SRA}.sra
 
 		touch refs/ok
@@ -31,7 +31,7 @@ pipeline() {
 
 	if [ ! -f qc/ok ]; then
 		docker_run gitobioinformatics/fastqc \
-			fastqc \
+			time -o qc/time fastqc \
 			refs/${NCBI_SRA}_1.fastq \
 			refs/${NCBI_SRA}_2.fastq \
 			--outdir qc/ \
@@ -43,7 +43,7 @@ pipeline() {
 
 	if [ ! -f trimmed/ok ]; then
 		docker_run gitobioinformatics/trimmomatic \
-			trimmomatic \
+			time -o trimmed/time trimmomatic \
 			PE -phred33 -threads $NJOBS \
 			refs/${NCBI_SRA}_1.fastq refs/${NCBI_SRA}_2.fastq \
 			trimmed/${NCBI_SRA}_1.fastq trimmed/r1_unpaired.fastq \
@@ -56,7 +56,7 @@ pipeline() {
 
 	if [ ! -f assembly/ok ]; then
 		docker_run gitobioinformatics/trinity \
-			trinity \
+			time -o assembly/time trinity \
 			--seqType fq --SS_lib_type FR \
 			--left trimmed/${NCBI_SRA}_1.fastq \
 			--right trimmed/${NCBI_SRA}_2.fastq \
@@ -69,14 +69,14 @@ pipeline() {
 
 	if [ ! -f bowtie/ok ]; then
 		docker_run gitobioinformatics/bowtie2 \
-			bowtie2-build assembly/trinity_assembly.Trinity.fasta bowtie/paired
+			time -o bowtie/time bowtie2-build assembly/trinity_assembly.Trinity.fasta bowtie/paired
 
 		touch bowtie/ok
 	fi
 
 	if [ ! -f alignment/ok ]; then
 		docker_run gitobioinformatics/bowtie2 \
-			bowtie2 \
+			time -o alignment/time bowtie2 \
 			-x bowtie/paired -S alignment/result.sam \
 			-1 trimmed/${NCBI_SRA}_1.fastq -2 trimmed/${NCBI_SRA}_2.fastq \
 			--threads $NJOBS
@@ -98,10 +98,10 @@ usage() {
 		  -u  Set user id for docker (default: current user)
 		  -w  Set working directory (default: pwd)
 	EOF
-	
+
 	exit 0
 }
-		
+
 while getopts "hs:w:j:m:u:g:" opt; do
 	case "$opt" in
 		h) usage ;;
