@@ -2,13 +2,6 @@
 
 set -e
 
-docker_run() {
-	docker run \
-		--user $USERID:$GROUPID --rm \
-		--mount type=bind,src=$PWD,dst=/data \
-		--workdir /data \
-		 $@
-}
 
 pipeline() {
 	cd "$WORKDIR"
@@ -31,8 +24,7 @@ pipeline() {
 	#fi
 
 	if [ ! -f qc/ok ]; then
-		docker_run gitobioinformatics/fastqc \
-			time -o qc/time fastqc \
+		time -o qc/time fastqc \
 			../raw-fastq/${NCBI_SRA}_1.fastq \
 			../raw-fastq/${NCBI_SRA}_2.fastq \
 			--outdir qc/ \
@@ -43,8 +35,7 @@ pipeline() {
 	fi
 
 	if [ ! -f trimmed/ok ]; then
-		docker_run gitobioinformatics/trimmomatic \
-			time -o trimmed/time trimmomatic \
+		time -o trimmed/time trimmomatic \
 			PE -phred33 -threads $NJOBS \
 			refs/${NCBI_SRA}_1.fastq refs/${NCBI_SRA}_2.fastq \
 			trimmed/${NCBI_SRA}_1.fastq trimmed/r1_unpaired.fastq \
@@ -56,8 +47,7 @@ pipeline() {
 	fi
 
 	if [ ! -f assembly/ok ]; then
-		docker_run gitobioinformatics/trinity \
-			time -o assembly/time trinity \
+		time -o assembly/time trinity \
 			--seqType fq --SS_lib_type FR \
 			--left trimmed/${NCBI_SRA}_1.fastq \
 			--right trimmed/${NCBI_SRA}_2.fastq \
@@ -69,15 +59,13 @@ pipeline() {
 	fi
 
 	if [ ! -f bowtie/ok ]; then
-		docker_run gitobioinformatics/bowtie2 \
-			time -o bowtie/time bowtie2-build assembly/trinity_assembly.Trinity.fasta bowtie/paired
+		time -o bowtie/time bowtie2-build assembly/trinity_assembly.Trinity.fasta bowtie/paired
 
 		touch bowtie/ok
 	fi
 
 	if [ ! -f alignment/ok ]; then
-		docker_run gitobioinformatics/bowtie2 \
-			time -o alignment/time bowtie2 \
+		time -o alignment/time bowtie2 \
 			-x bowtie/paired -S alignment/result.sam \
 			-1 trimmed/${NCBI_SRA}_1.fastq -2 trimmed/${NCBI_SRA}_2.fastq \
 			--threads $NJOBS
